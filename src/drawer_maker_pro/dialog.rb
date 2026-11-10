@@ -2,36 +2,36 @@ require 'json'
 
 module SketchupCloud
   module DrawerMakerPro
-    # HtmlDialog with the drawer parameters (mirrors the "Drawer" panel:
-    # insert face, accessories, size parameters, Create).
     class Dialog
       PREF_KEY = 'SketchupCloud_DrawerMakerPro'.freeze
+      @instances = []
 
-      def self.last_params
-        raw = Sketchup.read_default(PREF_KEY, 'params', nil)
-        raw ? JSON.parse(raw) : {}
-      rescue JSON::ParserError
-        {}
+      def self.open(target)
+        instance = new(target)
+        @instances << instance
+        instance.show { @instances.delete(instance) }
+        instance
       end
 
-      # target: { entities:, transformation:, space: } for a new set,
-      # or { set: Group } to edit an existing one.
       def initialize(target)
         @target = target
+        @model = Sketchup.active_model
+        @edit_path = @model.active_path
+        @kind = target[:kind] || 'drawer'
         @dialog = UI::HtmlDialog.new(
-          dialog_title: 'Drawer Maker Pro',
-          preferences_key: PREF_KEY,
-          scrollable: true, resizable: true,
-          width: 400, height: 720, min_width: 340, min_height: 480,
-          style: UI::HtmlDialog::STYLE_DIALOG
+          dialog_title: 'Drawer Maker Pro · Workshop', preferences_key: "#{PREF_KEY}_#{@kind}",
+          scrollable: true, resizable: true, width: 480, height: 820,
+          min_width: 360, min_height: 520, style: UI::HtmlDialog::STYLE_DIALOG
         )
         @dialog.set_file(File.join(__dir__, 'html', 'dialog.html'))
         @dialog.add_action_callback('ready') { |_ctx| push_state }
+        @dialog.add_action_callback('preview') { |_ctx, json| preview(json) }
         @dialog.add_action_callback('create') { |_ctx, json| on_create(json) }
         @dialog.add_action_callback('cancel') { |_ctx| @dialog.close }
       end
 
-      def show
+      def show(&on_close)
+        @dialog.set_on_closed(&on_close) if on_close
         @dialog.show
       end
 
@@ -41,34 +41,90 @@ module SketchupCloud
         @target.key?(:set)
       end
 
+      def calculator
+        @kind == 'cabinet' ? CabinetCalculator : Calculator
+      end
+
+      def builder
+        @kind == 'cabinet' ? CabinetBuilder : Builder
+      end
+
       def space
         edit? ? JSON.parse(@target[:set].get_attribute(Builder::DICT, 'space')) : @target[:space]
       end
 
       def params
-        stored = edit? ? @target[:set].get_attribute(Builder::DICT, 'params') : nil
-        Calculator.normalize(stored ? JSON.parse(stored) : self.class.last_params)
+        raw = if edit?
+                @target[:set].get_attribute(Builder::DICT, 'params')
+              else
+                Sketchup.read_default(PREF_KEY, @kind == 'drawer' ? 'params' : 'cabinet_params', nil)
+              end
+        calculator.normalize(raw ? JSON.parse(raw) : {})
+      rescue JSON::ParserError, ArgumentError
+        calculator.normalize({})
       end
 
       def push_state
-        state = { mode: edit? ? 'edit' : 'create', space: space, params: params }
+        assert_target!
+        state = { mode: edit? ? 'edit' : 'create', kind: @kind, space: space, params: params }
         @dialog.execute_script("DMP.load(#{JSON.generate(state)})")
+      rescue StandardError => e
+        error(e)
+      end
+
+      def request(json)
+        data = JSON.parse(json)
+        raise ArgumentError, 'Parameter tidak valid.' unless data.is_a?(Hash) && data['params'].is_a?(Hash)
+
+        size = @kind == 'cabinet' && !edit? ? data.fetch('space') : space
+        [size, data['params'], data['requestId']]
+      end
+
+      def preview(json)
+        size, p, request_id = request(json)
+        plan = calculator.compute(size, p)
+        if @kind == 'cabinet'
+          parts = plan[:parts] + plan[:doors].flat_map { |door| door[:parts] }
+          count = plan[:openings].length
+        else
+          parts = plan.flat_map { |drawer| drawer[:parts] }
+          count = plan.length
+        end
+        @dialog.execute_script("DMP.preview(#{JSON.generate(parts: parts.map(&:to_h), count: count, requestId: request_id)})")
+      rescue StandardError => e
+        error(e, request_id)
+      end
+
+      def assert_target!
+        raise ArgumentError, 'Model/konteks berubah. Tutup panel lalu pilih target kembali.' unless
+          Sketchup.active_model == @model && @model.active_path == @edit_path
+        raise ArgumentError, 'Set sudah dihapus. Tutup panel lalu pilih kembali.' if edit? && !@target[:set].valid?
+        raise ArgumentError, 'Set terkunci. Buka kunci terlebih dahulu.' if edit? && @target[:set].locked?
       end
 
       def on_create(json)
-        p = JSON.parse(json)
-        Calculator.compute(space, p) # validate before touching the model
-        if edit? && @target[:set].valid?
-          Builder.rebuild(@target[:set], p)
-        else
-          set = Builder.create(@target[:entities], @target[:transformation], space, p)
-          Sketchup.active_model.selection.clear
-          Sketchup.active_model.selection.add(set)
-        end
-        Sketchup.write_default(PREF_KEY, 'params', JSON.generate(p))
+        assert_target!
+        size, p = request(json)
+        calculator.compute(size, p)
+        set = if edit?
+                builder.rebuild(@target[:set], p)
+              else
+                builder.create(@target[:entities], @target[:transformation], size, p)
+              end
+        @model.selection.clear
+        @model.selection.add(set)
+        Sketchup.write_default(PREF_KEY, @kind == 'drawer' ? 'params' : 'cabinet_params', JSON.generate(p))
         @dialog.close
-      rescue ArgumentError, JSON::ParserError => e
-        @dialog.execute_script("DMP.error(#{JSON.generate(e.message)})")
+      rescue StandardError => e
+        error(e)
+      end
+
+      def error(exception, request_id = nil)
+        if request_id
+          @dialog.execute_script("DMP.error(#{JSON.generate(exception.message)}, #{JSON.generate(request_id)})")
+        else
+          @dialog.execute_script("DMP.busy(false); DMP.error(#{JSON.generate(exception.message)})")
+        end
       end
     end
   end
