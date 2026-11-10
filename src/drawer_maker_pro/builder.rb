@@ -12,7 +12,11 @@ module SketchupCloud
         'sub_front' => ['DMP Box',    Sketchup::Color.new(196, 160, 112)],
         'back'      => ['DMP Box',    Sketchup::Color.new(196, 160, 112)],
         'bottom'    => ['DMP Bottom', Sketchup::Color.new(170, 140, 100)],
-        'handle'    => ['DMP Handle', Sketchup::Color.new(60, 60, 60)]
+        'handle'    => ['DMP Handle', Sketchup::Color.new(60, 60, 60)],
+        'front_panel' => ['DMP Panel', Sketchup::Color.new(219, 211, 194)],
+        'glass'     => ['DMP Glass', Sketchup::Color.new(158, 206, 214)],
+        'metal_side' => ['DMP Metal', Sketchup::Color.new(123, 134, 144)],
+        'rail'      => ['DMP Metal', Sketchup::Color.new(123, 134, 144)]
       }.freeze
 
       module_function
@@ -45,6 +49,7 @@ module SketchupCloud
         model = Sketchup.active_model
         model.start_operation('Edit Drawers', true)
         begin
+          set.make_unique
           set.entities.clear!
           fill(set, space, params, drawers)
           model.commit_operation
@@ -61,11 +66,14 @@ module SketchupCloud
         set.set_attribute(DICT, 'type', 'set')
         set.set_attribute(DICT, 'space', JSON.generate(space))
         set.set_attribute(DICT, 'params', JSON.generate(p))
+        set.set_attribute(DICT, 'open', false)
 
         drawers.each do |drawer|
           dg = set.entities.add_group
           dg.name = "#{p['name']} #{drawer[:index]}"
           dg.set_attribute(DICT, 'type', 'drawer')
+          depth = drawer[:parts].select { |part| %w[side metal_side].include?(part.role) }.map(&:dy).max
+          dg.set_attribute(DICT, 'travel', (depth || drawer[:cell]['depth']) * 0.65)
           drawer[:parts].each { |part| add_part(dg.entities, part, p['name']) }
         end
       end
@@ -95,7 +103,10 @@ module SketchupCloud
       def material_for(role)
         name, color = COLORS[role] || COLORS['side']
         materials = Sketchup.active_model.materials
-        materials[name] || materials.add(name).tap { |m| m.color = color }
+        materials[name] || materials.add(name).tap do |m|
+          m.color = color
+          m.alpha = 0.35 if role == 'glass'
+        end
       end
     end
   end
