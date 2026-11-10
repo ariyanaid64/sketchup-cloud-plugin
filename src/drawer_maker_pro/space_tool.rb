@@ -57,7 +57,7 @@ module SketchupCloud
 
         view.drawing_color = Sketchup::Color.new(30, 90, 230)
         view.line_width = 2
-        box_edges(@first, @ip.position).each { |seg| view.draw(GL_LINES, seg) }
+        view.draw(GL_LINES, box_edges(@first, @ip.position))
       end
 
       def getExtents
