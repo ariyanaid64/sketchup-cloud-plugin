@@ -1,25 +1,6 @@
-require 'json'
-require 'minitest/autorun'
-require_relative '../src/drawer_maker_pro/calculator'
-require_relative '../src/drawer_maker_pro/cabinet_calculator'
+require_relative 'support/sketchup_fakes'
 
 module DialogTestSupport
-  class Model
-    attr_accessor :active_path
-    attr_reader :selection
-    def initialize
-      @selection = Selection.new
-    end
-  end
-
-  class Selection
-    include Enumerable
-    def initialize = @items = []
-    def each(&block) = @items.each(&block)
-    def clear = @items.clear
-    def add(item) = @items << item
-  end
-
   class Entity
     def initialize
       @attrs = {}
@@ -56,32 +37,7 @@ module DialogTestSupport
   end
 end
 
-unless defined?(Sketchup)
-  module Sketchup
-  end
-end
-class << Sketchup
-  attr_accessor :active_model
-  def test_defaults = (@defaults ||= {})
-  def read_default(section, key, default = nil) = test_defaults.fetch([section, key], default)
-  def write_default(section, key, value) = test_defaults[[section, key]] = value
-end
-unless defined?(UI)
-  module UI
-    HtmlDialog = DialogTestSupport::HtmlDialog
-  end
-end
-
-module SketchupCloud
-  module DrawerMakerPro
-    module Builder
-      DICT = 'DrawerMakerPro'.freeze unless const_defined?(:DICT)
-    end
-    module CabinetBuilder
-    end
-  end
-end
-require_relative '../src/drawer_maker_pro/dialog'
+UI.const_set(:HtmlDialog, DialogTestSupport::HtmlDialog) unless UI.const_defined?(:HtmlDialog)
 
 class DialogTest < Minitest::Test
   DMP = SketchupCloud::DrawerMakerPro
@@ -89,7 +45,7 @@ class DialogTest < Minitest::Test
   CABINET_SPACE = { 'width' => 900.0, 'depth' => 600.0, 'height' => 2200.0 }.freeze
 
   def setup
-    @model = DialogTestSupport::Model.new
+    @model = FakeSketchup::Model.new
     Sketchup.active_model = @model
     Sketchup.test_defaults.clear
     @builder_state = install_builder_stub(DMP::Builder, :drawer_set, :rebuilt_drawer_set)
@@ -129,7 +85,8 @@ class DialogTest < Minitest::Test
     params = { 'quantity' => '1', 'handle' => 'none' }
     dialog.call('preview', JSON.generate('requestId' => 73, 'params' => params))
     result = payload(dialog, 'DMP.preview')
-    expected = DMP::Calculator.compute(SPACE, params).flat_map { |d| d[:parts] }.map(&:to_h)
+    plan = DMP::Calculator.compute(SPACE, params)
+    expected = plan.flat_map { |d| d[:fixed].map(&:to_h) + d[:parts].map { |part| part.to_h.merge(moving: true) } }
     expected = JSON.parse(JSON.generate(expected))
     assert_equal 73, result['requestId']
     assert_equal 1, result['count']
@@ -142,10 +99,11 @@ class DialogTest < Minitest::Test
     dialog.call('preview', JSON.generate('requestId' => 'cab-9', 'space' => CABINET_SPACE, 'params' => params))
     result = payload(dialog, 'DMP.preview')
     plan = DMP::CabinetCalculator.compute(CABINET_SPACE, params)
-    expected = plan[:parts] + plan[:doors].flat_map { |door| door[:parts] }
+    expected = plan[:parts].map(&:to_h) + plan[:doors].flat_map { |door| door[:parts] }.map { |part| part.to_h.merge(moving: true) }
     assert_equal 'cab-9', result['requestId']
-    assert_equal plan[:openings].length, result['count']
-    assert_equal JSON.parse(JSON.generate(expected.map(&:to_h))), result['parts']
+    assert_equal plan[:doors].length + plan[:drawers].length, result['count']
+    assert_equal 2, result['count']
+    assert_equal JSON.parse(JSON.generate(expected)), result['parts']
   end
 
   def test_preview_errors_keep_request_id_for_stale_response_filtering
@@ -210,7 +168,7 @@ class DialogTest < Minitest::Test
   end
 
   def test_changed_model_or_active_edit_context_fails_without_rebuild
-    [-> { Sketchup.active_model = DialogTestSupport::Model.new }, -> { @model.active_path = [:changed] }].each do |change|
+    [-> { Sketchup.active_model = FakeSketchup::Model.new }, -> { @model.active_path = [:changed] }].each do |change|
       Sketchup.active_model = @model
       @model.active_path = [:original]
       dialog = open_dialog(set: stored_set)

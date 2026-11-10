@@ -1,44 +1,40 @@
 module SketchupCloud
   module DrawerMakerPro
+    # Doors and drawers open through the Dynamic Components Interact tool.
+    # This only returns everything in a set to the closed position.
     module Motion
       module_function
 
-      def toggle(set)
+      def close_all(set)
         raise ArgumentError, 'Set terkunci.' if set.locked?
-        model = Sketchup.active_model
-        model.start_operation('Open / Close', true)
-        begin
-          set.make_unique
-          moving = set.entities.grep(Sketchup::Group).select do |group|
-            %w[drawer door].include?(group.get_attribute(Builder::DICT, 'type'))
-          end
-          raise ArgumentError, 'Set ini tidak memiliki pintu atau laci.' if moving.empty?
 
-          opening = !set.get_attribute(Builder::DICT, 'open', false)
-          moving.each do |group|
-            stored = group.get_attribute(Builder::DICT, 'closed_transform')
-            closed = stored ? Geom::Transformation.new(stored) : group.transformation
-            group.set_attribute(Builder::DICT, 'closed_transform', closed.to_a)
-            group.transformation = opening ? movement(group) * closed : closed
+        Builder.operation('Tutup semua pintu & laci') do
+          set.make_unique
+          movers = set.entities.select do |entity|
+            (entity.is_a?(Sketchup::ComponentInstance) || entity.is_a?(Sketchup::Group)) &&
+              %w[drawer door].include?(entity.get_attribute(Builder::DICT, 'type'))
           end
-          set.set_attribute(Builder::DICT, 'open', opening)
-          model.commit_operation
-        rescue StandardError
-          model.abort_operation
-          raise
+          raise ArgumentError, 'Set ini tidak memiliki pintu atau laci.' if movers.empty?
+
+          movers.each { |entity| close(entity) }
+          movers.length
         end
       end
 
-      def movement(group)
-        if group.get_attribute(Builder::DICT, 'type') == 'drawer'
-          distance = group.get_attribute(Builder::DICT, 'travel', 300.0).to_f
-          Geom::Transformation.translation([0, -distance.mm, 0])
-        else
-          x = group.get_attribute(Builder::DICT, 'hinge_x').to_f.mm
-          y = group.get_attribute(Builder::DICT, 'hinge_y', 0).to_f.mm
-          z = group.get_attribute(Builder::DICT, 'hinge_z', 0).to_f.mm
-          angle = group.get_attribute(Builder::DICT, 'side') == 'left' ? -90 : 90
-          Geom::Transformation.rotation([x, y, z], [0, 0, 1], angle.degrees)
+      def close(entity)
+        if entity.is_a?(Sketchup::Group)
+          # Sets made by version 1.1 moved the group itself.
+          stored = entity.get_attribute(Builder::DICT, 'closed_transform')
+          entity.transformation = Geom::Transformation.new(stored) if stored
+          return
+        end
+        entity.definition.entities.grep(Sketchup::ComponentInstance).each do |child|
+          next unless child.get_attribute(Builder::DICT, 'type') == 'mover'
+
+          child.transformation = Geom::Transformation.new
+          %w[rotz y].each do |key|
+            child.set_attribute(Builder::DC, key, 0.0) if child.get_attribute(Builder::DC, key)
+          end
         end
       end
     end

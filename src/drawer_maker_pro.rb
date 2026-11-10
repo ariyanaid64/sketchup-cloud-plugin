@@ -4,7 +4,7 @@ require 'extensions.rb'
 module SketchupCloud
   module DrawerMakerPro
     PLUGIN_ID = 'drawer_maker_pro'.freeze
-    VERSION = '1.1.0'.freeze
+    VERSION = '1.2.0'.freeze
 
     unless file_loaded?(__FILE__)
       ex = SketchupExtension.new('Drawer Maker Pro', File.join(__dir__, PLUGIN_ID, 'main'))

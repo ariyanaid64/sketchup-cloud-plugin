@@ -7,6 +7,7 @@ require_relative 'space_tool'
 require_relative 'cutlist'
 require_relative 'dialog'
 require_relative 'motion'
+require_relative 'preview'
 
 module SketchupCloud
   module DrawerMakerPro
@@ -78,10 +79,11 @@ module SketchupCloud
       Dialog.open(set: set, kind: CabinetBuilder.cabinet_set?(set) ? 'cabinet' : 'drawer')
     end
 
-    def toggle_selected
+    def close_selected
       set = selected_set
       raise ArgumentError, 'Pilih satu set laci atau Smart Box terlebih dahulu.' unless set
-      Motion.toggle(set)
+
+      Motion.close_all(set)
     end
 
     def command(label, icon, description, &action)
@@ -105,12 +107,13 @@ module SketchupCloud
     end
 
     unless file_loaded?(__FILE__)
-      cabinet = command('Smart Box · New Cabinet', 'cabinet', 'Buat kabinet, sekat, rak, dan pintu di origin konteks aktif.') { create_cabinet }
+      cabinet = command('Smart Box · New Cabinet', 'cabinet', 'Buat kabinet produksi (sambungan, engsel, rel, laci) di origin konteks aktif.') { create_cabinet }
       insert = command('Insert Drawers', 'drawer', 'Pilih Smart Box untuk memilih ruang, atau pilih kotak ruang / set laci.') { insert_drawers }
       pick = command('Space Tool', 'space', 'Pilih dua sudut diagonal bagian dalam bukaan.') { pick_space }
       edit = command('Edit / Replace Style', 'edit', 'Ubah parameter, tipe laci, atau gaya pintu pada set terpilih.') { edit_selected }
-      motion = command('Open / Close', 'motion', 'Buka atau tutup semua pintu / laci pada set terpilih.') { toggle_selected }
-      cut = command('Export Cut List...', 'cutlist', 'Ekspor daftar part generik ke CSV.') { CutList.export }
+      motion = command('Tutup semua pintu & laci', 'motion',
+                       'Buka/tutup satu per satu dengan Interact Tool (Dynamic Components); perintah ini menutup semuanya.') { close_selected }
+      cut = command('Export Cut List...', 'cutlist', 'Ekspor cut list panel, hardware, dan edge banding ke CSV.') { CutList.export }
       @commands = [cabinet, insert, pick, edit, motion, cut]
       menu = UI.menu('Extensions').add_submenu('Drawer Maker Pro')
       @commands.each { |cmd| menu.add_item(cmd) }

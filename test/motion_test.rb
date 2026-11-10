@@ -1,155 +1,112 @@
-require 'minitest/autorun'
+require_relative 'support/sketchup_fakes'
 
-unless defined?(Sketchup)
-  module Sketchup
-    class << self
-      attr_accessor :active_model
-    end
-  end
-end
-Sketchup.const_set(:Group, Class.new) unless Sketchup.const_defined?(:Group)
-
-module MotionTestSupport
-  class Transformation
-    attr_reader :operations
-    def initialize(value = [])
-      @operations = value.is_a?(Array) ? value.dup : [value]
-    end
-    def self.translation(vector) = new([[:translation, vector]])
-    def self.rotation(origin, axis, angle) = new([[:rotation, origin, axis, angle]])
-    def *(other) = self.class.new(@operations + other.operations)
-    def to_a = @operations
-    def ==(other) = other.is_a?(self.class) && to_a == other.to_a
-  end
-
-  class Group < Sketchup::Group
-    attr_accessor :fail_transform
-    def initialize(type:, attributes: {}, transformation: Transformation.new([:closed]))
-      @attrs = attributes.merge('type' => type)
-      @transformation = transformation
-    end
-    def get_attribute(_dictionary, key, default = nil) = @attrs.fetch(key, default)
-    def set_attribute(_dictionary, key, value) = @attrs[key] = value
-    def transformation = @transformation
-    def transformation=(value)
-      raise RuntimeError, 'transform failed' if fail_transform
-      @transformation = value
-    end
-  end
-
-  class Entities
-    def initialize(groups) = @groups = groups
-    def grep(type) = @groups.grep(type)
-  end
-
-  class Set < Group
-    attr_reader :entities, :make_unique_calls
-    def initialize(groups, locked: false)
-      super(type: 'set')
-      @entities = Entities.new(groups)
-      @locked = locked
-      @make_unique_calls = 0
-    end
-    def locked? = @locked
-    def make_unique
-      @make_unique_calls += 1
-      self
-    end
-  end
-
-  class Model
-    attr_reader :operations
-    def initialize = @operations = []
-    def start_operation(name, transparent) = @operations << [:start, name, transparent]
-    def commit_operation = @operations << [:commit]
-    def abort_operation = @operations << [:abort]
-  end
-end
-
-unless defined?(Geom)
-  module Geom
-    Transformation = MotionTestSupport::Transformation
-  end
-end
-class Numeric
-  def mm = to_f unless method_defined?(:mm)
-  def degrees = to_f unless method_defined?(:degrees)
-end
-
-module SketchupCloud
-  module DrawerMakerPro
-    module Builder
-      DICT = 'DrawerMakerPro'.freeze unless const_defined?(:DICT)
-    end
-  end
-end
-require_relative '../src/drawer_maker_pro/motion'
-
+# Motion only closes things: opening is done by the Dynamic Components Interact tool.
 class MotionTest < Minitest::Test
-  Motion = SketchupCloud::DrawerMakerPro::Motion
-  DICT = SketchupCloud::DrawerMakerPro::Builder::DICT
+  include TestHelpers
+  Motion = DMP::Motion
+  DICT = DMP::Builder::DICT
+  DC = DMP::Builder::DC
 
   def setup
-    @model = MotionTestSupport::Model.new
+    @model = FakeSketchup::Model.new
     Sketchup.active_model = @model
   end
 
-  def test_open_close_restores_the_exact_saved_transform
-    closed = MotionTestSupport::Transformation.new([:original_transform, 7, 11])
-    drawer = moving_group('drawer', { 'travel' => 220.0 }, closed)
-    set = MotionTestSupport::Set.new([drawer])
-    Motion.toggle(set)
-    assert_equal [[:translation, [0.0, -220.0, 0.0]]] + closed.to_a, drawer.transformation.to_a
-    assert_equal closed.to_a, drawer.get_attribute(DICT, 'closed_transform')
-    assert_equal true, set.get_attribute(DICT, 'open')
-    Motion.toggle(set)
-    assert_equal closed, drawer.transformation
-    assert_equal false, set.get_attribute(DICT, 'open')
-    assert_equal [[:start, 'Open / Close', true], [:commit], [:start, 'Open / Close', true], [:commit]], @model.operations
+  def build_cabinet(params = {})
+    DMP::CabinetBuilder.create(@model.entities, Geom::Transformation.new,
+                               { 'width' => 900, 'depth' => 560, 'height' => 870 },
+                               { 'front_style' => 'slab', 'bay_fronts' => 'door, drawers:2' }.merge(params))
   end
 
-  def test_doors_rotate_around_hinge_with_side_specific_ninety_degree_sign
-    left = moving_group('door', { 'hinge_x' => 25, 'hinge_z' => 144, 'side' => 'left' })
-    right = moving_group('door', { 'hinge_x' => 510, 'hinge_z' => 144, 'side' => 'right' })
-    set = MotionTestSupport::Set.new([left, right])
-    Motion.toggle(set)
-    assert_equal [:rotation, [25.0, 0.0, 144.0], [0, 0, 1], -90.0], left.transformation.operations.first
-    assert_equal [:rotation, [510.0, 0.0, 144.0], [0, 0, 1], 90.0], right.transformation.operations.first
+  def wrappers(set) = set.entities.grep(Sketchup::ComponentInstance).select { |i| %w[door drawer].include?(i.get_attribute(DICT, 'type')) }
+  def mover_of(wrapper) = wrapper.definition.entities.grep(Sketchup::ComponentInstance).first
+
+  def open!(wrapper, key, value)
+    child = mover_of(wrapper)
+    child.transformation = Geom::Transformation.new([:animated, value])
+    child.set_attribute(DC, key, value)
+    child
   end
 
-  def test_drawer_travel_is_local_negative_y
-    drawer = moving_group('drawer', { 'travel' => 375.5 })
-    Motion.toggle(MotionTestSupport::Set.new([drawer]))
-    assert_equal [:translation, [0.0, -375.5, 0.0]], drawer.transformation.operations.first
-  end
+  def test_close_all_resets_every_mover_and_zeroes_the_dynamic_attributes
+    set = build_cabinet
+    door, drawer1, drawer2 = wrappers(set)
+    open!(door, 'rotz', -90.0)
+    open!(drawer1, 'y', -45.0)
+    open!(drawer2, 'y', -20.0)
 
-  def test_exception_aborts_operation_and_propagates
-    drawer = moving_group('drawer', { 'travel' => 100 })
-    drawer.fail_transform = true
-    set = MotionTestSupport::Set.new([drawer])
-    error = assert_raises(RuntimeError) { Motion.toggle(set) }
-    assert_equal 'transform failed', error.message
-    assert_equal [[:start, 'Open / Close', true], [:abort]], @model.operations
-  end
+    assert_equal 3, Motion.close_all(set)
 
-  def test_toggle_makes_set_unique_before_mutating_its_geometry
-    drawer = moving_group('drawer', { 'travel' => 100 })
-    set = MotionTestSupport::Set.new([drawer])
-    Motion.toggle(set)
+    [door, drawer1, drawer2].each { |w| assert_equal Geom::Transformation.new, mover_of(w).transformation }
+    assert_equal 0.0, mover_of(door).get_attribute(DC, 'rotz')
+    assert_equal 0.0, mover_of(drawer1).get_attribute(DC, 'y')
+    assert_equal 0.0, mover_of(drawer2).get_attribute(DC, 'y')
+    assert_equal [[:start, 'Insert Cabinet', true], [:commit], [:start, 'Tutup semua pintu & laci', true], [:commit]],
+                 @model.operations
     assert_equal 1, set.make_unique_calls
-    assert_equal true, set.get_attribute(DICT, 'open')
-    assert_equal [:commit], @model.operations.last
   end
 
-  def test_locked_set_is_rejected_before_starting_operation
-    set = MotionTestSupport::Set.new([moving_group('drawer', { 'travel' => 100 })], locked: true)
-    assert_raises(ArgumentError) { Motion.toggle(set) }
+  def test_close_all_does_not_invent_dynamic_attributes
+    set = build_cabinet
+    door = wrappers(set).first
+    mover_of(door).transformation = Geom::Transformation.new([:animated])
+    Motion.close_all(set)
+    assert_nil mover_of(door).get_attribute(DC, 'rotz')
+    assert_equal Geom::Transformation.new, mover_of(door).transformation
+  end
+
+  def test_close_all_leaves_wrappers_and_static_parts_alone
+    set = build_cabinet
+    before = wrappers(set).map(&:transformation)
+    Motion.close_all(set)
+    assert_equal before, wrappers(set).map(&:transformation)
+  end
+
+  def test_version_1_1_groups_return_to_their_closed_transform
+    closed = [:original, 7, 11]
+    legacy = FakeSketchup::Group.new
+    legacy.set_attribute(DICT, 'type', 'drawer')
+    legacy.set_attribute(DICT, 'closed_transform', closed)
+    legacy.transformation = Geom::Transformation.new([:open])
+    plain = FakeSketchup::Group.new
+    plain.set_attribute(DICT, 'type', 'door')
+    plain.transformation = Geom::Transformation.new([:untouched])
+    set = FakeSketchup::Group.new
+    set.entities.items.push(legacy, plain)
+
+    assert_equal 2, Motion.close_all(set)
+    assert_equal Geom::Transformation.new(closed), legacy.transformation
+    assert_equal Geom::Transformation.new([:untouched]), plain.transformation
+  end
+
+  def test_locked_set_is_rejected_before_starting_an_operation
+    set = build_cabinet
+    set.instance_variable_set(:@locked, true)
+    @model.operations.clear
+    error = assert_raises(ArgumentError) { Motion.close_all(set) }
+    assert_match(/terkunci/, error.message)
     assert_empty @model.operations
   end
 
-  private
+  def test_set_without_movers_aborts_the_operation
+    set = FakeSketchup::Group.new
+    error = assert_raises(ArgumentError) { Motion.close_all(set) }
+    assert_match(/tidak memiliki/, error.message)
+    assert_equal [[:start, 'Tutup semua pintu & laci', true], [:abort]], @model.operations
+  end
 
-  def moving_group(type, attributes = {}, transformation = MotionTestSupport::Transformation.new([:closed]))
-    MotionTestSupport::Group.new(type: type, attributes: attributes, transformation: transformation)
+  def test_failure_while_closing_aborts_and_propagates
+    set = build_cabinet
+    @model.operations.clear
+    wrappers(set).each { |w| open!(w, 'y', -1.0) }
+    broken = mover_of(wrappers(set).first)
+    broken.define_singleton_method(:transformation=) { |_| raise 'transform failed' }
+    error = assert_raises(RuntimeError) { Motion.close_all(set) }
+    assert_equal 'transform failed', error.message
+    assert_equal [[:start, 'Tutup semua pintu & laci', true], [:abort]], @model.operations
+  end
+
+  def test_there_is_no_scripted_toggle_any_more
+    refute_respond_to Motion, :toggle
   end
 end

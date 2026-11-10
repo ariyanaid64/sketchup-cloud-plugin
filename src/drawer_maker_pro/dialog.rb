@@ -82,15 +82,8 @@ module SketchupCloud
 
       def preview(json)
         size, p, request_id = request(json)
-        plan = calculator.compute(size, p)
-        if @kind == 'cabinet'
-          parts = plan[:parts] + plan[:doors].flat_map { |door| door[:parts] }
-          count = plan[:openings].length
-        else
-          parts = plan.flat_map { |drawer| drawer[:parts] }
-          count = plan.length
-        end
-        @dialog.execute_script("DMP.preview(#{JSON.generate(parts: parts.map(&:to_h), count: count, requestId: request_id)})")
+        payload = Preview.payload(@kind, size, p, request_id)
+        @dialog.execute_script("DMP.preview(#{JSON.generate(payload)})")
       rescue StandardError => e
         error(e, request_id)
       end

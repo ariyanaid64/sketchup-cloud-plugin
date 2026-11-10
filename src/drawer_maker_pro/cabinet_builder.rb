@@ -3,7 +3,8 @@ require_relative 'cabinet_calculator'
 
 module SketchupCloud
   module DrawerMakerPro
-    # Builds and edits cabinet sets in SketchUp using the shared part builder.
+    # Builds and edits cabinet sets: static carcass + hardware, doors and
+    # drawers as Dynamic Components (see Builder.add_mover).
     module CabinetBuilder
       DICT = Builder::DICT
 
@@ -13,39 +14,26 @@ module SketchupCloud
         entity.is_a?(Sketchup::Group) && entity.get_attribute(DICT, 'type') == 'cabinet_set'
       end
 
-      # `transformation` places the space's front-bottom-left origin.
+      # `transformation` places the cabinet's external front-bottom-left corner.
       def create(entities, transformation, space, params = {})
         layout = CabinetCalculator.compute(space, params)
-        model = Sketchup.active_model
-        model.start_operation('Insert Cabinet', true)
-        begin
+        Builder.operation('Insert Cabinet') do
           set = entities.add_group
           set.transformation = transformation
           fill(set, space, params, layout)
-          model.commit_operation
           set
-        rescue StandardError
-          model.abort_operation
-          raise
         end
       end
 
       def rebuild(set, params)
-        raise ArgumentError, 'Entity is not a cabinet set' unless cabinet_set?(set)
+        raise ArgumentError, 'Objek terpilih bukan set kabinet' unless cabinet_set?(set)
 
         space = JSON.parse(set.get_attribute(DICT, 'space'))
         layout = CabinetCalculator.compute(space, params)
-        model = Sketchup.active_model
-        model.start_operation('Edit Cabinet', true)
-        begin
-          set.make_unique
-          set.entities.clear!
+        Builder.operation('Edit Cabinet') do
+          Builder.clear(set)
           fill(set, space, params, layout)
-          model.commit_operation
           set
-        rescue StandardError
-          model.abort_operation
-          raise
         end
       end
 
@@ -56,22 +44,17 @@ module SketchupCloud
         set.set_attribute(DICT, 'space', JSON.generate(space))
         set.set_attribute(DICT, 'params', JSON.generate(p))
         set.set_attribute(DICT, 'openings', JSON.generate(layout[:openings]))
-        set.set_attribute(DICT, 'open', false)
-
-        carcass = set.entities.add_group
-        carcass.name = "#{p['name']} Carcass"
-        carcass.set_attribute(DICT, 'type', 'carcass')
-        layout[:parts].each { |part| Builder.add_part(carcass.entities, part, p['name']) }
-
+        cache = Builder.hardware_cache
+        carcass = Builder.add_static(set.entities, "#{p['name']} Carcass", 'carcass', layout[:parts], p['name'], cache)
+        carcass&.set_attribute(DICT, 'type', 'carcass')
         layout[:doors].each do |door|
-          group = set.entities.add_group
-          group.name = door[:name]
-          group.set_attribute(DICT, 'type', 'door')
-          group.set_attribute(DICT, 'hinge_x', door[:hinge_x])
-          group.set_attribute(DICT, 'hinge_y', door[:hinge_y])
-          group.set_attribute(DICT, 'hinge_z', door[:hinge_z])
-          group.set_attribute(DICT, 'side', door[:side])
-          door[:parts].each { |part| Builder.add_part(group.entities, part, p['name']) }
+          Builder.add_mover(set.entities, door[:name], door[:parts], p['name'], cache,
+                            kind: 'door', origin: [door[:hinge_x], door[:hinge_y], 0.0],
+                            side: door[:side], angle: door[:angle])
+        end
+        layout[:drawers].each do |drawer|
+          Builder.add_mover(set.entities, drawer[:name], drawer[:parts], p['name'], cache,
+                            kind: 'drawer', origin: [0.0, 0.0, 0.0], travel: drawer[:travel])
         end
         set
       end
