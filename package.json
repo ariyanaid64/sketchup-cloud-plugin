@@ -1,0 +1,6 @@
+{
+  "name": "drawer-maker-pro-checks",
+  "private": true,
+  "scripts": { "test:ui": "node test/ui_test.cjs" },
+  "devDependencies": { "playwright": "1.56.1" }
+}
