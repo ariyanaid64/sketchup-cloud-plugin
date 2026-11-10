@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drawer Maker Pro</title>
+<style>
+  * { box-sizing: border-box; }
+  :root { color-scheme: light; }
+  body { margin: 0; min-width: 360px; min-height: 100vh; font: 12px "Segoe UI", -apple-system, Arial, sans-serif; color: #202b3c; background: #f1f4f8; }
+  button, input, select { font: inherit; }
+  button { cursor: pointer; }
+  .app { display: flex; min-height: 100vh; }
+  .rail { flex: 0 0 42px; background: #17263c; display: flex; flex-direction: column; align-items: center; padding: 13px 0; gap: 12px; }
+  .brand { width: 28px; height: 28px; border-radius: 9px; background: #2c75d8; color: white; display: grid; place-items: center; box-shadow: 0 3px 8px #0d1b2c66; }
+  .rail-mark { width: 20px; height: 1px; background: #526176; margin: 1px 0; }
+  .rail-label { writing-mode: vertical-rl; transform: rotate(180deg); color: #9eacc0; font-size: 9px; letter-spacing: .16em; font-weight: 700; margin-top: auto; }
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; height: 100vh; max-height: 100vh; }
+  .topbar { min-height: 53px; padding: 9px 13px; display: flex; align-items: center; gap: 8px; background: #fff; border-bottom: 1px solid #e2e8f0; }
+  .title-wrap { min-width: 0; }
+  .eyebrow { color: #75849a; font-size: 9px; letter-spacing: .13em; font-weight: 700; text-transform: uppercase; }
+  .title { margin-top: 2px; color: #18283e; font-size: 14px; line-height: 17px; font-weight: 700; }
+  .mode-pill { border: 1px solid #d9e6f8; color: #2864a9; background: #f0f6ff; border-radius: 20px; padding: 4px 8px; font-size: 10px; white-space: nowrap; }
+  .space-pill { margin-left: auto; color: #53657b; background: #f3f6fa; border: 1px solid #e6ebf1; border-radius: 7px; padding: 5px 7px; font-size: 10px; white-space: nowrap; }
+  .content { flex: 1; min-height: 0; overflow-y: auto; padding: 10px 11px 14px; }
+  .intro { padding: 2px 1px 1px; color: #67778c; font-size: 11px; line-height: 1.45; }
+  .card { overflow: hidden; margin: 9px 0; border: 1px solid #e1e7ef; border-radius: 10px; background: #fff; box-shadow: 0 2px 7px #1d35570a; }
+  .card-head { width: 100%; padding: 9px 11px; border: 0; background: #fff; color: #22334b; display: flex; align-items: center; text-align: left; gap: 7px; font-weight: 700; }
+  .card-head:hover { background: #fafbfd; }
+  .chevron { width: 16px; color: #8290a3; text-align: center; }
+  .card.closed .chevron { transform: rotate(-90deg); }
+  .card.closed .card-body { display: none; }
+  .card-title { flex: 1; }
+  .card-hint { color: #8190a3; font-size: 10px; font-weight: 400; }
+  .card-body { padding: 9px 11px 11px; border-top: 1px solid #edf0f4; }
+  .preview-tools { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 7px; }
+  .preview-title { color: #718096; font-size: 10px; }
+  .toggle { padding: 2px; border: 1px solid #e1e7ef; border-radius: 7px; background: #f3f6fa; display: inline-flex; }
+  .toggle button { padding: 4px 7px; border: 0; border-radius: 5px; color: #68788e; background: transparent; font-size: 10px; }
+  .toggle button.on { color: #1e5ca6; background: #fff; box-shadow: 0 1px 3px #253a561f; font-weight: 700; }
+  .preview-stage { position: relative; border: 1px solid #e5ebf2; border-radius: 8px; overflow: hidden; background: linear-gradient(145deg, #fbfcfe, #f3f6fa); }
+  #preview { width: 100%; height: 205px; display: block; }
+  .preview-foot { min-height: 25px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 6px; }
+  #previewStatus { color: #62738a; font-size: 10px; }
+  #previewCount { color: #76859a; font-size: 10px; }
+  .presets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+  .preset { min-height: 58px; padding: 8px; text-align: left; border: 1px solid #e1e7ef; border-radius: 8px; background: #fff; color: #263852; }
+  .preset:hover { border-color: #9bbde8; background: #f9fbff; }
+  .preset.selected { border-color: #4b8bdb; box-shadow: 0 0 0 1px #4b8bdb inset; background: #f2f7ff; }
+  .preset strong { display: block; margin-bottom: 3px; font-size: 11px; }
+  .preset span { display: block; color: #77869a; font-size: 10px; line-height: 1.3; }
+  .preset-actions { display: flex; justify-content: flex-end; margin-top: 7px; }
+  .text-btn { padding: 3px 0; border: 0; color: #3573bd; background: transparent; font-size: 10px; }
+  .row { display: flex; align-items: center; gap: 8px; min-height: 28px; margin: 6px 0; }
+  .row > label, .row > .label { flex: 0 0 108px; color: #42536a; font-size: 11px; line-height: 1.25; }
+  .row label small, .row .label small { display: block; margin-top: 2px; color: #8a97a8; font-size: 9px; }
+  .ctl { flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0; }
+  input[type=text], input[type=number], select { width: 100%; min-width: 0; height: 29px; padding: 0 8px; border: 1px solid #d7dee8; border-radius: 6px; background: #fff; color: #25354b; }
+  input[type=number] { text-align: right; }
+  select { padding-right: 4px; }
+  input:focus, select:focus, button:focus { outline: 2px solid #a8cdf8; outline-offset: 1px; }
+  input[readonly] { color: #68788d; background: #f4f6f9; }
+  .unit { flex: 0 0 auto; color: #8996a8; font-size: 10px; }
+  .seg { display: inline-flex; width: 100%; padding: 2px; border: 1px solid #e3e8ef; border-radius: 7px; background: #f3f6f9; }
+  .seg button { flex: 1; min-width: 0; padding: 5px 3px; border: 0; border-radius: 5px; color: #64748a; background: transparent; font-size: 10px; }
+  .seg button.on { color: #245f9e; background: white; box-shadow: 0 1px 3px #1b345022; font-weight: 700; }
+  .dimensions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .dimension { min-width: 0; padding: 7px; border-radius: 7px; background: #f5f7fa; }
+  .dimension label { display: block; margin-bottom: 4px; color: #7c899a; font-size: 9px; }
+  .dimension input { text-align: right; }
+  .hint-box { margin-top: 7px; color: #718096; font-size: 10px; line-height: 1.4; }
+  .error { display: none; margin: 0 0 8px; padding: 8px 10px; border: 1px solid #f2c5c5; border-radius: 7px; color: #a82d2d; background: #fff1f1; line-height: 1.4; }
+  .footer { display: flex; justify-content: flex-end; align-items: center; gap: 8px; padding: 9px 12px; border-top: 1px solid #e1e7ef; background: #fff; }
+  .btn { min-height: 31px; padding: 0 13px; border: 1px solid transparent; border-radius: 7px; font-weight: 700; }
+  .btn.ghost { color: #53647a; background: #f2f5f8; border-color: #e6eaf0; }
+  .btn.primary { color: #fff; background: #286fc3; box-shadow: 0 2px 4px #286fc333; }
+  .btn.primary:hover { background: #205fa9; }
+  .btn:disabled { opacity: .58; cursor: wait; }
+  [hidden] { display: none !important; }
+  .section-note { margin: 4px 0 2px; padding: 6px 8px; border-radius: 6px; background: #f3f7fc; color: #52647c; font-size: 10px; line-height: 1.4; }
+  .row .help { display: block; margin-top: 2px; color: #8a97a8; font-size: 9px; }
+  .footer { flex-direction: column; align-items: stretch; gap: 6px; }
+  .footer-actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
+  .error-bar { display: none; padding: 7px 10px; border: 1px solid #f2c5c5; border-radius: 7px; color: #a82d2d; background: #fff1f1; font-size: 11px; line-height: 1.35; max-height: 84px; overflow-y: auto; word-break: break-word; }
+  .busy-hint { display: none; padding: 5px 9px; border-radius: 7px; color: #7a5a14; background: #fff8e6; border: 1px solid #f0dca6; font-size: 10px; }
+  .dc-info { color: #52647c; font-size: 10px; line-height: 1.4; }
+  @media (max-width: 390px) {
+    .rail { flex-basis: 34px; }
+    .topbar { padding-left: 9px; padding-right: 9px; }
+    .content { padding-left: 8px; padding-right: 8px; }
+    .row > label, .row > .label { flex-basis: 96px; }
+    .card-body { padding-left: 8px; padding-right: 8px; }
+    #preview { height: 185px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="rail" aria-label="Drawer Maker Pro">
+    <div class="brand" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 2.5h12v11H2zM2 6h12M2 9.5h12M6 3.8h4M6 7.4h4M6 11h4"/></svg></div>
+    <div class="rail-mark"></div><div class="rail-label">WORKSHOP</div>
+  </nav>
+  <main class="main">
+    <header class="topbar">
+      <div class="title-wrap"><div class="eyebrow">Drawer Maker Pro · Workshop</div><div class="title" id="mainTitle">Drawer</div></div>
+      <span class="mode-pill" id="modeBadge">Mode baru</span>
+      <span class="space-pill" id="spaceLabel">—</span>
+    </header>
+    <div class="content" id="content">
+      <p class="intro" id="introText">Atur konstruksi, ukuran, dan detail laci. Pratinjau menampilkan geometri parametrik.</p>
+      <div class="error" id="error" role="alert"></div>
+
+      <section class="card" id="previewCard">
+        <button class="card-head" type="button" aria-expanded="true"><span class="chevron">⌄</span><span class="card-title">Pratinjau rakitan</span><span class="card-hint" id="previewHint">Menunggu geometri</span></button>
+        <div class="card-body">
+          <div class="preview-tools"><span class="preview-title">Tampilan komponen aktual</span><div class="toggle" role="group" aria-label="Sudut pratinjau"><button type="button" data-view="front" class="on" aria-pressed="true">Depan</button><button type="button" data-view="iso" aria-pressed="false">Isometrik</button></div></div>
+          <div class="preview-stage"><svg id="preview" role="img" aria-label="Pratinjau geometri kabinet atau laci"></svg></div>
+          <div class="preview-foot"><span id="previewStatus" aria-live="polite">Memuat ukuran komponen…</span><span id="previewCount"></span></div>
+        </div>
+      </section>
+
+      <section class="card" id="presetCard">
+        <button class="card-head" type="button" aria-expanded="true"><span class="chevron">⌄</span><span class="card-title">Pilih inspirasi</span><span class="card-hint">Template lokal · bisa disesuaikan</span></button>
+        <div class="card-body"><div class="presets" id="presets"></div><div class="preset-actions"><button class="text-btn" id="resetPreset" type="button">Pulihkan preset</button></div></div>
+      </section>
+
+      <section class="card" id="spaceCard">
+        <button class="card-head" type="button" aria-expanded="true"><span class="chevron">⌄</span><span class="card-title">Dimensi ruang</span><span class="card-hint" id="spaceHint">mm</span></button>
+        <div class="card-body" id="spaceFields"></div>
+      </section>
+
+      <div id="sections"></div>
+    </div>
+    <footer class="footer">
+      <div class="error-bar" id="errorBar" role="alert"></div>
+      <div class="busy-hint" id="busyHint" role="status"></div>
+      <div class="dc-info" id="dcInfo">Pintu &amp; laci dibuat sebagai Dynamic Component: gunakan Interact Tool (ikon tangan) untuk membuka/menutup.</div>
+      <div class="footer-actions"><button class="btn ghost" id="cancel" type="button">Batal</button><button class="btn primary" id="create" type="button">Buat rakitan</button></div>
+    </footer>
+  </main>
+</div>
+
+<script>
+var DMP = (function () {
+  var state = { mode: 'create', kind: 'drawer', space: { width: 600, depth: 550, height: 720 }, params: {} };
+  var HANDLES = [['none', 'Tanpa'], ['push_open', 'Push-open (tip-on)'], ['bar', 'Bar handle'], ['knob', 'Knob'], ['gola', 'Gola (profil aluminium)'], ['j_pull', 'J-pull (profil J)'], ['shark_tooth', 'Shark tooth (bevel 45° belakang)'], ['edge_profile', 'Profil aluminium tepi']];
+  var FRONT_STYLES = [['slab', 'Polos / slab'], ['shaker', 'Shaker berbingkai'], ['glass', 'Panel kaca']];
+  var DRAWER_TYPES = [['wooden', 'Kayu'], ['metal', 'Kotak metal'], ['rail', 'Sisi rel rendah']];
+  var SLIDES = [['ball_bearing', 'Ball bearing samping 12,7 mm'], ['roller', 'Roller/epoxy 12,5 mm'], ['undermount', 'Undermount soft-close'], ['custom', 'Custom']];
+  var BOTTOMS = [['groove', 'Alur (groove)'], ['nailed', 'Dipaku / tempel']];
+  var JOINTS = [['butt', 'Butt (sambung rapat)'], ['dado', 'Dado (alur)']];
+  function isFramed(p) { return p.front_style === 'shaker' || p.front_style === 'glass'; }
+  function hasDrawers(p) { return String(p.bay_fronts || '').indexOf('drawers') >= 0; }
+
+  function field(type, key, label, extra) { var f = { key: key, type: type, label: label }, k; for (k in extra) f[k] = extra[k]; return f; }
+  function N(key, label, unit, extra) { var e = { unit: unit === undefined ? 'mm' : unit, step: 0.5 }, k; for (k in extra) e[k] = extra[k]; return field('number', key, label, e); }
+  function T(key, label, extra) { return field('text', key, label, extra); }
+  function S(key, label, options, extra) { var e = { options: options }, k; for (k in extra) e[k] = extra[k]; return field('select', key, label, e); }
+  function G(key, label, options, extra) { var e = { options: options }, k; for (k in extra) e[k] = extra[k]; return field('seg', key, label, e); }
+
+  var edgeSection = { title: 'Edge banding', hint: 'Tebal tepi', fields: [N('edge_thick', 'Edge tebal (tampak)', 'mm', { step: 0.1 }), N('edge_thin', 'Edge tipis (samping)', 'mm', { step: 0.1 })] };
+  var schema = {
+    drawer: [
+      { title: 'Muka & fit', hint: 'Fasad', fields: [
+        T('name', 'Nama rakitan'),
+        G('layout', 'Arah susunan', [['vertical', 'Bertumpuk'], ['horizontal', 'Menyamping']]),
+        T('quantity', 'Jumlah / proporsi', { help: 'Contoh: 3 sama besar, 1:1:2 proporsional, atau 200:1:1 (mm tetap + proporsi).' }),
+        G('front_mode', 'Posisi muka', [['inset', 'Inset'], ['overlay', 'Overlay']]),
+        N('overlay', 'Jarak overlay', 'mm', { show: function (p) { return p.front_mode === 'overlay'; } }),
+        N('gap', 'Celah antar muka'),
+        N('front_thickness', 'Tebal muka'),
+        S('front_style', 'Gaya muka', FRONT_STYLES),
+        N('frame_width', 'Lebar bingkai', 'mm', { show: isFramed }),
+        N('panel_thickness', 'Tebal panel', 'mm', { show: isFramed })
+      ] },
+      { title: 'Pegangan', hint: 'Handle / handleless', fields: [
+        S('handle', 'Pegangan', HANDLES),
+        N('handle_length', 'Jarak lubang c-c', 'mm', { step: 1, show: function (p) { return p.handle === 'bar'; } }),
+        N('gola_gap', 'Celah gola', 'mm', { step: 1, show: function (p) { return p.handle === 'gola'; } })
+      ] },
+      { title: 'Kotak laci & sambungan', hint: 'Konstruksi', fields: [
+        S('drawer_type', 'Konstruksi kotak', DRAWER_TYPES),
+        N('board_thickness', 'Tebal papan'),
+        N('metal_thickness', 'Tebal sisi metal', 'mm', { show: function (p) { return p.drawer_type === 'metal'; } }),
+        N('rail_height', 'Tinggi sisi rel', 'mm', { step: 1, show: function (p) { return p.drawer_type === 'rail'; } }),
+        S('drawer_joint', 'Sambungan kotak', JOINTS),
+        N('bottom_thickness', 'Tebal dasar'),
+        S('drawer_bottom', 'Pemasangan dasar', BOTTOMS),
+        N('groove_depth', 'Kedalaman alur', 'mm', { show: function (p) { return p.drawer_bottom === 'groove' || p.drawer_joint === 'dado'; } }),
+        N('bottom_raise', 'Posisi alur dari bawah'),
+        N('drawer_depth', 'Kedalaman laci', '0 = otomatis', { step: 1 }),
+        N('box_height', 'Tinggi kotak', '0 = otomatis', { step: 1 })
+      ] },
+      { title: 'Rel laci', hint: 'Slide', fields: [
+        S('slide_type', 'Jenis rel', SLIDES),
+        N('slide_clearance', 'Ruang rel per sisi', 'mm', { show: function (p) { return p.slide_type === 'custom'; } }),
+        N('slide_length', 'Panjang rel', '0 = otomatis', { step: 1, help: '0 = otomatis: panjang rel standar 250–650 mm kelipatan 50.' })
+      ] },
+      { title: 'Clearance', hint: 'Kelonggaran', fields: [
+        N('top_clearance', 'Kelonggaran atas', 'mm', { step: 1 }),
+        N('bottom_clearance', 'Kelonggaran bawah', 'mm', { step: 1 }),
+        N('back_clearance', 'Ruang belakang', 'mm', { step: 1 })
+      ] },
+      edgeSection
+    ],
+    cabinet: [
+      { title: 'Bodi & dimensi', hint: 'Rangka kabinet', fields: [
+        T('name', 'Nama kabinet'),
+        S('cabinet_type', 'Tipe kabinet', [['base', 'Kabinet bawah'], ['wall', 'Kabinet atas (dinding)'], ['tall', 'Lemari tinggi']]),
+        N('board_thickness', 'Tebal papan bodi'),
+        S('base_type', 'Dasar kabinet', [['plinth', 'Plint (kickboard)'], ['legs', 'Kaki'], ['none', 'Tanpa']]),
+        N('plinth_height', 'Tinggi plint', 'mm', { step: 1, show: function (p) { return p.base_type === 'plinth' || p.base_type === 'legs'; }, labelFn: function (p) { return p.base_type === 'legs' ? 'Tinggi kaki' : 'Tinggi plint'; } }),
+        N('plinth_setback', 'Plint mundur', 'mm', { step: 1, show: function (p) { return p.base_type === 'plinth'; } }),
+        S('top_type', 'Panel atas', [['full', 'Panel penuh'], ['rails', 'Rel / stretcher']]),
+        N('rail_width', 'Lebar rel', 'mm', { step: 1, show: function (p) { return p.top_type === 'rails'; } })
+      ] },
+      { title: 'Sambungan & panel belakang', hint: 'Joinery', fields: [
+        S('carcass_joint', 'Sambungan bodi', [['confirmat', 'Confirmat'], ['minifix', 'Minifix'], ['dowel', 'Dowel'], ['dado', 'Dado (alur)']]),
+        N('dado_depth', 'Kedalaman dado', 'mm', { show: function (p) { return p.carcass_joint === 'dado'; } }),
+        S('back_mode', 'Pemasangan panel belakang', [['groove', 'Alur (groove)'], ['rabbet', 'Rabbet (takik)'], ['nailed', 'Dipaku / tempel']]),
+        N('back_thickness', 'Tebal panel belakang'),
+        N('back_groove_depth', 'Kedalaman alur', 'mm', { show: function (p) { return p.back_mode === 'groove'; } }),
+        N('back_inset', 'Jarak dari belakang', 'mm', { show: function (p) { return p.back_mode === 'groove'; } })
+      ] },
+      { title: 'Kolom, rak & muka per kolom', hint: 'Pembagian', fields: [
+        T('columns', 'Pembagian kolom', { help: 'Jumlah (2), rasio (1:2), atau ukuran tetap mm (400:1:1).' }),
+        T('bay_fronts', 'Muka per kolom', { help: 'Daftar per kolom, pisah koma. Token: door, door1, door2, open, drawers:3, drawers:1:1:2. Contoh: "door, drawers:3". Kosong = semua pintu.' }),
+        N('shelves', 'Ambalan per kolom', '', { step: 1, min: 0, integer: true }),
+        G('shelf_type', 'Jenis ambalan', [['adjustable', 'Bisa diatur'], ['fixed', 'Mati']]),
+        N('shelf_setback', 'Ambalan mundur', 'mm', { step: 1 })
+      ] },
+      { title: 'Pintu & engsel', hint: 'Hinge', fields: [
+        S('door_mode', 'Konfigurasi pintu', [['auto', 'Otomatis'], ['single', 'Satu pintu'], ['double', 'Dua pintu'], ['none', 'Tanpa pintu · terbuka']]),
+        S('door_fit', 'Posisi pintu / engsel', [['full_overlay', 'Full overlay (engsel lurus 0)'], ['half_overlay', 'Half overlay (engsel 9,5)'], ['inset', 'Inset (engsel 18)']]),
+        N('gap', 'Celah muka'),
+        N('hinge_angle', 'Sudut buka engsel', '°', { step: 1 }),
+        N('cup_distance', 'Jarak cup dari tepi', 'mm'),
+        S('front_style', 'Gaya muka', FRONT_STYLES),
+        N('front_thickness', 'Tebal muka'),
+        N('frame_width', 'Lebar bingkai', 'mm', { show: isFramed }),
+        N('panel_thickness', 'Tebal panel', 'mm', { show: isFramed })
+      ] },
+      { title: 'Pegangan / handleless', hint: 'Handle', fields: [
+        S('handle', 'Pegangan', HANDLES),
+        N('handle_length', 'Jarak lubang c-c', 'mm', { step: 1, show: function (p) { return p.handle === 'bar'; } }),
+        N('gola_gap', 'Celah gola', 'mm', { step: 1, show: function (p) { return p.handle === 'gola'; } }),
+        S('pull_edge', 'Sisi tarik', [['auto', 'Otomatis'], ['top', 'Atas'], ['bottom', 'Bawah'], ['side', 'Samping']])
+      ] },
+      { title: 'Laci (untuk kolom laci)', hint: 'Kotak & rel', show: hasDrawers, fields: [
+        S('drawer_type', 'Konstruksi kotak', DRAWER_TYPES),
+        N('drawer_board_thickness', 'Tebal papan laci'),
+        N('metal_thickness', 'Tebal sisi metal', 'mm', { show: function (p) { return p.drawer_type === 'metal'; } }),
+        N('rail_height', 'Tinggi sisi rel', 'mm', { step: 1, show: function (p) { return p.drawer_type === 'rail'; } }),
+        S('drawer_joint', 'Sambungan kotak', JOINTS),
+        N('drawer_bottom_thickness', 'Tebal dasar laci'),
+        S('drawer_bottom', 'Pemasangan dasar', BOTTOMS),
+        S('slide_type', 'Jenis rel', SLIDES),
+        N('slide_clearance', 'Ruang rel per sisi', 'mm', { show: function (p) { return p.slide_type === 'custom'; } }),
+        N('slide_length', 'Panjang rel', '0 = otomatis', { step: 1 })
+      ] },
+      edgeSection
+    ]
+  };
+  var defaults = {
+    drawer: { name: 'Drawer', layout: 'vertical', quantity: '3', front_mode: 'inset', overlay: 16, gap: 3, front_thickness: 18, front_style: 'slab', frame_width: 60, panel_thickness: 6, handle: 'bar', handle_length: 128, gola_gap: 30, drawer_type: 'wooden', slide_type: 'ball_bearing', slide_clearance: 12.5, slide_length: 0, drawer_depth: 0, board_thickness: 15, bottom_thickness: 6, bottom_raise: 12, drawer_bottom: 'groove', groove_depth: 6, drawer_joint: 'butt', top_clearance: 25, bottom_clearance: 15, back_clearance: 10, box_height: 0, metal_thickness: 13, rail_height: 90, edge_thick: 1, edge_thin: 0.4 },
+    cabinet: { name: 'Cabinet', cabinet_type: 'base', board_thickness: 18, back_thickness: 6, back_mode: 'groove', back_groove_depth: 8, back_inset: 10, base_type: 'plinth', plinth_height: 100, plinth_setback: 50, top_type: 'full', rail_width: 100, carcass_joint: 'minifix', dado_depth: 8, columns: '2', bay_fronts: '', shelves: 1, shelf_type: 'adjustable', shelf_setback: 20, door_mode: 'auto', door_fit: 'full_overlay', gap: 3, hinge_angle: 110, cup_distance: 4, front_style: 'slab', front_thickness: 18, frame_width: 60, panel_thickness: 6, handle: 'bar', handle_length: 128, gola_gap: 30, pull_edge: 'auto', drawer_type: 'wooden', slide_type: 'ball_bearing', slide_clearance: 12.5, slide_length: 0, drawer_board_thickness: 15, drawer_bottom_thickness: 6, drawer_bottom: 'groove', drawer_joint: 'butt', metal_thickness: 13, rail_height: 90, edge_thick: 1, edge_thin: 0.4 }
+  };
+  var presets = {
+    drawer: [
+      { id: 'wood_classic', title: 'Kayu klasik', detail: 'Kotak kayu · ball bearing · bar', values: { drawer_type: 'wooden', slide_type: 'ball_bearing', handle: 'bar' } },
+      { id: 'undermount', title: 'Undermount soft-close', detail: 'Rel bawah · push-open', values: { slide_type: 'undermount', handle: 'push_open' } },
+      { id: 'metal_box', title: 'Metal box', detail: 'Sisi metal · J-pull', values: { drawer_type: 'metal', handle: 'j_pull' } },
+      { id: 'gola', title: 'Handleless gola', detail: 'Profil gola aluminium', values: { handle: 'gola' } },
+      { id: 'shark', title: 'Shark tooth', detail: 'Bevel 45° tanpa handle', values: { handle: 'shark_tooth' } }
+    ],
+    cabinet: [
+      { id: 'kitchen_base', title: 'Kabinet bawah dapur', detail: 'Plint · rel atas · gola', values: { cabinet_type: 'base', top_type: 'rails', base_type: 'plinth', handle: 'gola', door_fit: 'full_overlay' } },
+      { id: 'drawer_cab', title: 'Kabinet laci', detail: '1 kolom · 3 laci 1:1:2', values: { cabinet_type: 'base', columns: '1', bay_fronts: 'drawers:1:1:2', handle: 'bar' } },
+      { id: 'wall_cab', title: 'Kabinet atas', detail: 'Tanpa dasar · shark tooth', values: { cabinet_type: 'wall', base_type: 'none', handle: 'shark_tooth', pull_edge: 'bottom', shelves: 1 } },
+      { id: 'tall_cab', title: 'Lemari tinggi', detail: 'Kaki · 4 ambalan · bar', values: { cabinet_type: 'tall', base_type: 'legs', shelves: 4, handle: 'bar', pull_edge: 'side' } },
+      { id: 'glass_cab', title: 'Etalase kaca', detail: 'Pintu kaca inset · knob', values: { front_style: 'glass', door_fit: 'inset', handle: 'knob' } }
+    ]
+  };
+  var selectedPreset = null, viewMode = 'front', requestId = 0, previewTimer = null, busy = false, currentPreview = null, busyTimer = null;
+
+  function $(selector) { return document.querySelector(selector); }
+  function $$(selector) { return Array.prototype.slice.call(document.querySelectorAll(selector)); }
+  function call(name, arg) {
+    if (window.sketchup && window.sketchup[name]) { arg === undefined ? window.sketchup[name]() : window.sketchup[name](arg); }
+    else { console.log('[sketchup.' + name + ']', arg); }
+  }
+  function merge(a, b) { var result = {}, key; for (key in a) if (a.hasOwnProperty(key)) result[key] = a[key]; for (key in b) if (b.hasOwnProperty(key)) result[key] = b[key]; return result; }
+  function numeric(value) { var n = Number(value); return isFinite(n) ? n : 0; }
+  function escapeXml(value) { return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;'); }
+  function fields() { var out = []; schema[state.kind].forEach(function (s) { out = out.concat(s.fields); }); return out; }
+  function currentPayload() { return { space: state.space, params: read() }; }
+  function pickKnown(params) {
+    var out = {}, base = defaults[state.kind], key;
+    for (key in base) if (base.hasOwnProperty(key)) out[key] = params[key] !== undefined && params[key] !== null ? params[key] : base[key];
+    return out;
+  }
+  function read() {
+    fields().forEach(function (f) {
+      var el = document.getElementById(f.key);
+      if (!el || f.type === 'seg') return;
+      if (f.type === 'number') { var n = numeric(el.value); state.params[f.key] = f.integer ? Math.max(0, Math.round(n)) : n; }
+      else state.params[f.key] = el.value;
+    });
+    return pickKnown(state.params);
+  }
+  function write() {
+    fields().forEach(function (f) {
+      var value = state.params[f.key], el = document.getElementById(f.key);
+      if (f.type === 'seg') markSeg(f.key, value);
+      else if (el && value !== undefined) el.value = value;
+    });
+  }
+  function markSeg(key, value) {
+    $$('#' + key + ' button').forEach(function (button) {
+      var on = button.getAttribute('data-v') === value;
+      button.classList.toggle('on', on); button.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+  function controlHtml(f) {
+    var id = f.key, desc = f.help ? ' aria-describedby="' + id + '_help"' : '';
+    if (f.type === 'seg') return '<div class="seg" id="' + id + '" data-field="' + id + '" role="group" aria-labelledby="' + id + '_label">' + f.options.map(function (o) { return '<button type="button" data-v="' + o[0] + '" aria-pressed="false">' + escapeXml(o[1]) + '</button>'; }).join('') + '</div>';
+    if (f.type === 'select') return '<select id="' + id + '" data-field="' + id + '">' + f.options.map(function (o) { return '<option value="' + o[0] + '">' + escapeXml(o[1]) + '</option>'; }).join('') + '</select>';
+    if (f.type === 'number') return '<input id="' + id + '" type="number" data-field="' + id + '" step="' + f.step + '"' + (f.min !== undefined ? ' min="' + f.min + '"' : '') + desc + '>' + (f.unit ? '<span class="unit">' + escapeXml(f.unit) + '</span>' : '');
+    return '<input id="' + id + '" type="text" data-field="' + id + '"' + desc + '>';
+  }
+  function renderSections() {
+    $('#sections').innerHTML = schema[state.kind].map(function (s, si) {
+      var rows = s.fields.map(function (f) {
+        var labelEl = f.type === 'seg' ? '<span class="label" id="' + f.key + '_label">' + escapeXml(f.label) + '</span>' : '<label for="' + f.key + '" id="' + f.key + '_label">' + escapeXml(f.label) + '</label>';
+        return '<div class="field" data-row="' + f.key + '"><div class="row">' + labelEl + '<div class="ctl">' + controlHtml(f) + '</div></div>' + (f.help ? '<div class="hint-box" id="' + f.key + '_help">' + escapeXml(f.help) + '</div>' : '') + '</div>';
+      }).join('');
+      return '<section class="card" data-section="' + si + '"><button class="card-head" type="button" aria-expanded="true"><span class="chevron">⌄</span><span class="card-title">' + escapeXml(s.title) + '</span><span class="card-hint">' + escapeXml(s.hint) + '</span></button><div class="card-body">' + rows + '</div></section>';
+    }).join('');
+  }
+  function activePreset() {
+    var list = presets[state.kind] || [];
+    for (var i = 0; i < list.length; i++) if (list[i].id === selectedPreset) return list[i];
+    return list[0] || null;
+  }
+  function applyPreset(id) {
+    var list = presets[state.kind] || [], preset = null;
+    for (var i = 0; i < list.length; i++) if (list[i].id === id) preset = list[i];
+    if (!preset) return;
+    selectedPreset = preset.id;
+    var keepName = read().name;
+    state.params = merge(merge(defaults[state.kind], preset.values), { name: keepName });
+    write(); refresh(); queuePreview();
+  }
+  function renderPresets() {
+    var holder = $('#presets'), list = presets[state.kind] || [];
+    holder.innerHTML = list.map(function (preset) {
+      return '<button type="button" class="preset' + (preset.id === selectedPreset ? ' selected' : '') + '" data-preset="' + escapeXml(preset.id) + '" aria-pressed="' + (preset.id === selectedPreset ? 'true' : 'false') + '"><strong>' + escapeXml(preset.title) + '</strong><span>' + escapeXml(preset.detail) + '</span></button>';
+    }).join('');
+  }
+  function renderSpace() {
+    var holder = $('#spaceFields'), keys = ['width', 'depth', 'height'], names = ['Lebar', 'Kedalaman', 'Tinggi'];
+    holder.innerHTML = '<div class="dimensions">' + keys.map(function (key, index) {
+      var editable = state.kind === 'cabinet' && state.mode === 'create';
+      return '<div class="dimension"><label for="space_' + key + '">' + names[index] + ' (mm)</label><input id="space_' + key + '" type="number" data-space="' + key + '" step="1" value="' + escapeXml(state.space[key]) + '"' + (editable ? '' : ' readonly aria-readonly="true"') + '></div>';
+    }).join('') + '</div>' + (state.kind === 'drawer' ? '<div class="hint-box">Ukuran ruang berasal dari area yang dipilih di SketchUp.</div>' : '');
+  }
+  function createLabel() { return state.mode === 'edit' ? 'Terapkan perubahan' : (state.kind === 'cabinet' ? 'Buat kabinet' : 'Buat laci'); }
+  function setKindVisibility() {
+    $('#mainTitle').textContent = state.kind === 'cabinet' ? 'Kabinet' : 'Laci';
+    $('#introText').textContent = state.kind === 'cabinet' ? 'Rancang bodi, sambungan, engsel, pegangan, dan laci kabinet sesuai kaidah produksi. Ukuran dapat disesuaikan saat membuat kabinet baru.' : 'Atur muka, rel, kotak laci, dan sambungan sesuai kaidah produksi. Pratinjau menampilkan geometri parametrik.';
+    $('#modeBadge').textContent = state.mode === 'edit' ? 'Edit rakitan' : 'Mode baru';
+    $('#create').textContent = createLabel();
+    $('#spaceHint').textContent = state.kind === 'cabinet' && state.mode === 'create' ? 'dapat diubah · mm' : 'dari area SketchUp';
+    $('#presetCard').hidden = state.mode === 'edit';
+    $('#resetPreset').textContent = 'Pulihkan ' + ((activePreset() || {}).title || 'preset');
+    renderPresets(); renderSpace(); renderSections();
+  }
+  function refreshVisibility() {
+    var p = state.params;
+    schema[state.kind].forEach(function (s, si) {
+      var card = $('[data-section="' + si + '"]');
+      if (card) card.hidden = s.show ? !s.show(p) : false;
+      s.fields.forEach(function (f) {
+        var row = $('[data-row="' + f.key + '"]');
+        if (row) row.hidden = f.show ? !f.show(p) : false;
+        if (f.labelFn) { var l = document.getElementById(f.key + '_label'); if (l) l.textContent = f.labelFn(p); }
+      });
+    });
+    $$('.preset').forEach(function (el) { el.classList.toggle('selected', el.getAttribute('data-preset') === selectedPreset); el.setAttribute('aria-pressed', el.getAttribute('data-preset') === selectedPreset ? 'true' : 'false'); });
+    $('#resetPreset').textContent = 'Pulihkan ' + ((activePreset() || {}).title || 'preset');
+    $('#spaceLabel').textContent = [state.space.width, state.space.height, state.space.depth].map(function (value) { return Math.round(numeric(value) * 10) / 10; }).join(' × ') + ' mm';
+  }
+  function refresh() { read(); refreshVisibility(); }
+  function queuePreview() {
+    if (previewTimer) window.clearTimeout(previewTimer);
+    var id = ++requestId;
+    previewTimer = window.setTimeout(function () {
+      previewTimer = null;
+      var payload = currentPayload(); payload.requestId = id;
+      $('#previewStatus').textContent = 'Memperbarui geometri…';
+      call('preview', JSON.stringify(payload));
+    }, 100);
+  }
+  var HARDWARE_ROLES = ['hinge', 'hinge_plate', 'connector', 'slide', 'leg', 'shelf_pin', 'gola', 'handle', 'knob', 'push_latch'];
+  function isHardware(part) { return part.kind === 'hardware' || HARDWARE_ROLES.indexOf(String(part.role || '')) >= 0; }
+  function roleStyle(role, hardware) {
+    var styles = { front: ['#bb8958', '#845a34'], front_panel: ['#d2ad7c', '#9c784d'], glass: ['#a8d9e4', '#5598a8'], side: ['#c99d6d', '#90643d'], metal_side: ['#aebbc9', '#6b7d91'], bottom: ['#dfc69e', '#9c7c4e'], back: ['#d7c2a1', '#9c825c'], shelf: ['#bd966c', '#866340'], top: ['#c9a77d', '#96704a'], door: ['#bd8b5a', '#805735'], panel: ['#dfc198', '#99764f'], plinth: ['#9d744f', '#674a32'], divider: ['#c2976a', '#8a603a'], rail: ['#cfb08a', '#8f7050'], sub_front: ['#c7a273', '#8a6a44'] };
+    if (hardware) return ['#aab3bd', '#5d6773'];
+    return styles[role] || ['#c9ad88', '#8d7455'];
+  }
+  function previewParts(data) { return data && data.parts && Object.prototype.toString.call(data.parts) === '[object Array]' ? data.parts : []; }
+  function drawPreview(data) {
+    var svg = $('#preview'), parts = previewParts(data), width = svg.clientWidth || 320, height = svg.clientHeight || 205;
+    var markup = '', minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity, minY = Infinity, maxY = -Infinity;
+    parts.forEach(function (part) {
+      var x = numeric(part.x), y = numeric(part.y), z = numeric(part.z), dx = numeric(part.dx), dy = numeric(part.dy), dz = numeric(part.dz);
+      minX = Math.min(minX, x); maxX = Math.max(maxX, x + dx); minY = Math.min(minY, y); maxY = Math.max(maxY, y + dy); minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z + dz);
+    });
+    svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height); svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    if (!parts.length || !isFinite(minX)) {
+      svg.innerHTML = '<text x="' + (width / 2) + '" y="' + (height / 2) + '" text-anchor="middle" fill="#8593a5" font-size="11">Menunggu geometri parametrik…</text>';
+      $('#previewStatus').textContent = 'Belum ada geometri'; $('#previewCount').textContent = '';
+      $('#previewHint').textContent = 'Menunggu geometri'; return;
+    }
+    var projected = parts.map(function (part) {
+      var x = numeric(part.x), y = numeric(part.y), z = numeric(part.z), dx = numeric(part.dx), dy = numeric(part.dy), dz = numeric(part.dz);
+      var points;
+      if (viewMode === 'iso') {
+        function project(px, py, pz) { return { x: (px + py) * .72, y: pz + (py - px) * .34 }; }
+        var p0 = project(x, y, z), p1 = project(x + dx, y, z), p2 = project(x + dx, y, z + dz), p3 = project(x, y, z + dz);
+        var p4 = project(x, y + dy, z), p5 = project(x + dx, y + dy, z), p6 = project(x + dx, y + dy, z + dz), p7 = project(x, y + dy, z + dz);
+        points = [p0, p1, p2, p3, p5, p6, p7, p4];
+      } else points = [{ x: x, y: z }, { x: x + dx, y: z }, { x: x + dx, y: z + dz }, { x: x, y: z + dz }];
+      return { part: part, points: points, depth: viewMode === 'iso' ? x - y + z : y };
+    });
+    var all = [];
+    projected.forEach(function (item) { all = all.concat(item.points); });
+    var pMinX = Infinity, pMaxX = -Infinity, pMinY = Infinity, pMaxY = -Infinity;
+    all.forEach(function (pt) { pMinX = Math.min(pMinX, pt.x); pMaxX = Math.max(pMaxX, pt.x); pMinY = Math.min(pMinY, pt.y); pMaxY = Math.max(pMaxY, pt.y); });
+    var pad = 18, spanX = Math.max(pMaxX - pMinX, 1), spanY = Math.max(pMaxY - pMinY, 1);
+    var scale = Math.min((width - pad * 2) / spanX, (height - pad * 2) / spanY);
+    var offsetX = (width - spanX * scale) / 2, offsetY = (height - spanY * scale) / 2;
+    function sx(value) { return offsetX + (value - pMinX) * scale; }
+    function sy(value) { return height - offsetY - (value - pMinY) * scale; }
+    projected.sort(function (a, b) { var ha = isHardware(a.part) ? 1 : 0, hb = isHardware(b.part) ? 1 : 0; if (viewMode === 'front' && ha !== hb) return ha - hb; return viewMode === 'iso' ? a.depth - b.depth : b.depth - a.depth; });
+    projected.forEach(function (item) {
+      var role = String(item.part.role || ''), hw = isHardware(item.part), style = roleStyle(role, hw), transparent = role === 'glass';
+      var poly = item.points.map(function (pt) { return sx(pt.x) + ',' + sy(pt.y); }).join(' ');
+      var name = escapeXml((item.part.name || role || 'Komponen') + (item.part.moving ? ' (bergerak)' : ''));
+      if (viewMode === 'iso') {
+        var pts = item.points;
+        var front = [pts[0], pts[1], pts[2], pts[3]], side = [pts[1], pts[4], pts[5], pts[2]], top = [pts[3], pts[2], pts[5], pts[6]];
+        markup += '<polygon points="' + side.map(function (pt) { return sx(pt.x) + ',' + sy(pt.y); }).join(' ') + '" fill="' + style[1] + '" stroke="#674f39" stroke-width=".7" fill-opacity="' + (transparent ? '.48' : '.94') + '"/>';
+        markup += '<polygon points="' + top.map(function (pt) { return sx(pt.x) + ',' + sy(pt.y); }).join(' ') + '" fill="' + style[0] + '" stroke="#674f39" stroke-width=".7" fill-opacity="' + (transparent ? '.48' : '.94') + '"/>';
+        markup += '<polygon points="' + front.map(function (pt) { return sx(pt.x) + ',' + sy(pt.y); }).join(' ') + '" fill="' + style[0] + '" stroke="#674f39" stroke-width=".7" fill-opacity="' + (transparent ? '.48' : '.96') + '"><title>' + name + '</title></polygon>';
+      } else markup += '<polygon points="' + poly + '" fill="' + style[0] + '" stroke="' + style[1] + '" stroke-width=".8" fill-opacity="' + (transparent ? '.48' : '.96') + '"><title>' + name + '</title></polygon>';
+    });
+    svg.innerHTML = markup;
+    $('#previewStatus').textContent = 'Geometri parametrik';
+    $('#previewCount').textContent = (data.count !== undefined ? data.count : parts.length) + (state.kind === 'cabinet' ? ' bukaan' : ' laci');
+    $('#previewHint').textContent = parts.length + ' bagian';
+  }
+  var errorText = '';
+  function showError(message) {
+    errorText = String(message || 'Terjadi kesalahan.');
+    var top = $('#error'), bar = $('#errorBar');
+    top.textContent = errorText; top.style.display = 'block';
+    bar.textContent = errorText; bar.style.display = 'block';
+    if (top.scrollIntoView) top.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+  function hideError() { errorText = ''; $('#error').style.display = 'none'; $('#errorBar').style.display = 'none'; }
+  function setBusy(value) {
+    busy = !!value;
+    var btn = $('#create'), hint = $('#busyHint');
+    btn.disabled = busy; btn.textContent = busy ? 'Memproses…' : createLabel();
+    if (busyTimer) { window.clearTimeout(busyTimer); busyTimer = null; }
+    hint.style.display = 'none'; hint.textContent = '';
+    if (busy) busyTimer = window.setTimeout(function () {
+      busyTimer = null; hint.textContent = 'Masih memproses… cek Ruby Console jika tidak berubah'; hint.style.display = 'block';
+    }, 8000);
+  }
+  function load(next) {
+    next = next || {};
+    state.mode = next.mode === 'edit' ? 'edit' : 'create';
+    state.kind = next.kind === 'cabinet' ? 'cabinet' : 'drawer';
+    state.space = merge({ width: 600, depth: 550, height: 720 }, next.space || {});
+    var given = next.params || {}, empty = !Object.keys(given).length;
+    selectedPreset = state.mode === 'create' ? ((presets[state.kind][0] || {}).id || null) : null;
+    state.params = merge(defaults[state.kind], given);
+    if (state.mode === 'create' && empty) state.params = merge(defaults[state.kind], (presets[state.kind][0] || {}).values || {});
+    currentPreview = null; requestId++; hideError(); setBusy(false);
+    setKindVisibility(); write(); refresh(); drawPreview(null); queuePreview();
+  }
+  function receivePreview(data) {
+    if (typeof data === 'string') { try { data = JSON.parse(data); } catch (e) { return; } }
+    if (!data) return;
+    if (data.requestId !== undefined && Number(data.requestId) !== requestId) return;
+    currentPreview = data; hideError(); drawPreview(currentPreview);
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    $$('.card-head').forEach(bindCardHead);
+    $('#sections').addEventListener('click', function (event) {
+      var head = event.target; while (head && head !== this && !(head.classList && head.classList.contains('card-head'))) head = head.parentNode;
+      if (head && head !== this) { toggleCard(head); return; }
+      var value = event.target.getAttribute && event.target.getAttribute('data-v'), seg = event.target.parentNode;
+      if (!value || !seg || !seg.classList || !seg.classList.contains('seg')) return;
+      state.params[seg.getAttribute('data-field')] = value; markSeg(seg.id, value); refresh(); queuePreview();
+    });
+    $('#sections').addEventListener('input', onFieldEdit);
+    $('#sections').addEventListener('change', onFieldEdit);
+    $('#presets').addEventListener('click', function (event) { var button = event.target; while (button && button.getAttribute && !button.getAttribute('data-preset')) button = button.parentNode; if (button && button.getAttribute && button.getAttribute('data-preset')) applyPreset(button.getAttribute('data-preset')); });
+    $('#resetPreset').addEventListener('click', function () { var preset = activePreset(); if (preset) applyPreset(preset.id); });
+    $$('[data-view]').forEach(function (button) { button.addEventListener('click', function () { viewMode = button.getAttribute('data-view'); $$('[data-view]').forEach(function (item) { var on = item === button; item.classList.toggle('on', on); item.setAttribute('aria-pressed', on ? 'true' : 'false'); }); drawPreview(currentPreview); }); });
+    function onSpace(event) { var key = event.target.getAttribute('data-space'); if (key) { state.space[key] = numeric(event.target.value); refreshVisibility(); queuePreview(); } }
+    $('#spaceFields').addEventListener('input', onSpace);
+    $('#spaceFields').addEventListener('change', onSpace);
+    $('#create').addEventListener('click', function () { hideError(); setBusy(true); call('create', JSON.stringify(currentPayload())); });
+    $('#cancel').addEventListener('click', function () { call('cancel'); });
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') call('cancel');
+      else if (event.key === 'Enter' && event.target.tagName === 'INPUT' && (event.target.type === 'text' || event.target.type === 'number')) { event.preventDefault(); if (!busy) $('#create').click(); }
+    });
+    call('ready');
+  });
+  function toggleCard(button) { var card = button.parentNode, closed = card.classList.toggle('closed'); button.setAttribute('aria-expanded', closed ? 'false' : 'true'); }
+  function bindCardHead(button) { if (!$('#sections').contains(button)) button.addEventListener('click', function () { toggleCard(button); }); }
+  function onFieldEdit(event) { if (event.target.getAttribute && event.target.getAttribute('data-field')) { refresh(); queuePreview(); } }
+
+  return {
+    load: load,
+    preview: receivePreview,
+    error: function (message, previewRequestId) {
+      if (previewRequestId !== undefined && previewRequestId !== null && Number(previewRequestId) !== requestId) return;
+      setBusy(false); showError(message);
+    },
+    busy: setBusy
+  };
+})();
+</script>
+</body>
+</html>
